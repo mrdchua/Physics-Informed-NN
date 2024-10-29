@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 # Domain settings: Infinite square well from x=-10 to x=10
-x_domain = [-5.0, 5.0]
+x_domain = [-10.0, 10.0]
 t_domain = [0.0, 2.0]  # Time interval
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
@@ -40,13 +40,13 @@ def pde(x, y):
 def init_cond_u(x):
     # u = Re(ψ) part of the initial wave packet
     k = 0.0 # initial momentum / wave number
-    sigma = 0.1 # width of Gaussian wave packet
+    sigma = 2.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.cos(k * x[:, 0:1]) * g
 
 def init_cond_v(x):
     k = 0.0 # initial momentum / wave number
-    sigma = 0.1 # width of Gaussian wave packet
+    sigma = 2.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.sin(k * x[:, 0:1]) * g
 
@@ -165,7 +165,7 @@ fig, ax = plt.subplots(figsize=(10, 6))
 line, = ax.plot([], [], color='blue', lw=2, label='|ψ(x, t)|')
 
 ax.set_xlim(x_domain[0], x_domain[1])
-ax.set_ylim(0, 1.5)  # Adjust this based on your data's amplitude
+ax.set_ylim(0, 1.2)  # Adjust this based on your data's amplitude
 ax.set_xlabel('x')
 ax.set_ylabel('|ψ(x, t)|')
 ax.set_title('Wave Function Propagation')
@@ -204,7 +204,7 @@ def update(frame):
     return line, time_text
 
 # Create the animation
-anim = FuncAnimation(fig, update, frames=len(t_vals), init_func=init, blit=True, interval=50)
+anim = FuncAnimation(fig, update, frames=len(t_vals), init_func=init, blit=True, interval=300)
 
 # Display the animation
 plt.show()
