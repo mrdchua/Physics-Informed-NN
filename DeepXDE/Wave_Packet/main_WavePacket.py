@@ -5,9 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-# Domain settings: Infinite square well from x=0 to L=1
-L = 10.0
-x_domain = [0.0, L]
+# Domain settings: Infinite square well from x=-10 to x=10
+x_domain = [-5.0, 5.0]
 t_domain = [0.0, 2.0]  # Time interval
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
@@ -33,20 +32,23 @@ def pde(x, y):
     u_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
     v_xx = dde.grad.hessian(y, x, component=1, i=0, j=0)
 
-    f_u = v_t - 0.5*u_xx # - (u**2 + v**2)*u
-    f_v = u_t + 0.5*v_xx # + (u**2 + v**2)*v
+    f_u = v_t - 0.5*u_xx
+    f_v = u_t + 0.5*v_xx
 
     return [f_u, f_v]
 
 def init_cond_u(x):
     # u = Re(ψ) part of the initial wave packet
-    k0 = 0.0 # initial momentum
+    k = 0.0 # initial momentum / wave number
     sigma = 0.1 # width of Gaussian wave packet
-    return np.exp(-((x[:, 0:1] - L / 2) ** 2) / (2 * sigma ** 2)) * np.cos(k0 * x[:, 0:1])
+    g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
+    return np.cos(k * x[:, 0:1]) * g
 
 def init_cond_v(x):
-    # v = Im(ψ) part is initially 0
-    return np.zeros_like(x[:, 0:1])
+    k = 0.0 # initial momentum / wave number
+    sigma = 0.1 # width of Gaussian wave packet
+    g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
+    return np.sin(k * x[:, 0:1]) * g
 
 # Dirichlet boundary conditions: ψ(0, t) = ψ(L, t) = 0
 def boundary(_, on_boundary):
@@ -65,7 +67,7 @@ data = dde.data.TimePDE(
     geomtime,
     pde,
     [bc_u, bc_v, ic_u, ic_v],
-    num_domain=10000,
+    num_domain=20000,
     num_boundary=50,
     num_initial=200,
     train_distribution="pseudo",
@@ -77,7 +79,7 @@ net = dde.nn.FNN([2] + [100] * 4 + [2], "tanh", "Glorot normal")
 # Model setup
 model = dde.Model(data, net)
 model.compile("adam", lr=1e-3, loss="MSE")
-model.train(iterations=16000, display_every=1000)
+model.train(iterations=10000, display_every=1000)
 
 dde.optimizers.config.set_LBFGS_options(
     maxcor=50,
