@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 x_domain = [-5.0, 5.0]
 t_domain = [0.0, np.pi/2.0]
 
-x = np.linspace(x_domain[0], x_domain[1], 256)
-t = np.linspace(t_domain[0], t_domain[1], 201)
-X, T = np.meshgrid(x, t)
+# x = np.linspace(x_domain[0], x_domain[1], 256)
+# t = np.linspace(t_domain[0], t_domain[1], 201)
+# X, T = np.meshgrid(x, t)
 
-X_star = np.hstack((X.flatten()[:, None], T.flatten()[:, None]))
+# X_star = np.hstack((X.flatten()[:, None], T.flatten()[:, None]))
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
 time_domain = dde.geometry.TimeDomain(t_domain[0], t_domain[1])
