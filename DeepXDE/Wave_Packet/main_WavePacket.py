@@ -7,7 +7,7 @@ from matplotlib.animation import FuncAnimation
 
 # Domain settings: Infinite square well from x=-10 to x=10
 x_domain = [-10.0, 10.0]
-t_domain = [0.0, 2.0]  # Time interval
+t_domain = [0.0, 5.0]  # Time interval
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
 time_domain = dde.geometry.TimeDomain(t_domain[0], t_domain[1])
@@ -40,26 +40,23 @@ def pde(x, y):
 def init_cond_u(x):
     # u = Re(ψ) part of the initial wave packet
     k = 0.0 # initial momentum / wave number
-    sigma = 2.0 # width of Gaussian wave packet
+    sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.cos(k * x[:, 0:1]) * g
 
 def init_cond_v(x):
     k = 0.0 # initial momentum / wave number
-    sigma = 2.0 # width of Gaussian wave packet
+    sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.sin(k * x[:, 0:1]) * g
 
-# Dirichlet boundary conditions: ψ(0, t) = ψ(L, t) = 0
-def boundary(_, on_boundary):
-    return on_boundary
-
-bc_u = dde.icbc.DirichletBC(geomtime, lambda _: 0, boundary, component=0)  # u part
-bc_v = dde.icbc.DirichletBC(geomtime, lambda _: 0, boundary, component=1)  # v part
+# Dirichlet boundary conditions
+bc_u = dde.icbc.DirichletBC(geomtime, lambda x: 0, lambda _, on_boundary: on_boundary, component=0)
+bc_v = dde.icbc.DirichletBC(geomtime, lambda x: 0, lambda _, on_boundary: on_boundary, component=1)
 
 # Initial conditions
-ic_u = dde.icbc.IC(geomtime, init_cond_u, lambda _, on_initial: on_initial, component=0)
-ic_v = dde.icbc.IC(geomtime, init_cond_v, lambda _, on_initial: on_initial, component=1)
+ic_u = dde.icbc.IC(geomtime, lambda x: init_cond_u(x), lambda _, on_initial: on_initial, component=0)
+ic_v = dde.icbc.IC(geomtime, lambda x: init_cond_v(x), lambda _, on_initial: on_initial, component=1)
 
 #############################################################################################
 
@@ -79,7 +76,7 @@ net = dde.nn.FNN([2] + [100] * 4 + [2], "tanh", "Glorot normal")
 # Model setup
 model = dde.Model(data, net)
 model.compile("adam", lr=1e-3, loss="MSE")
-model.train(iterations=10000, display_every=1000)
+model.train(iterations=5000, display_every=1000)
 
 dde.optimizers.config.set_LBFGS_options(
     maxcor=50,
