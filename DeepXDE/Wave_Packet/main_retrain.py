@@ -73,10 +73,26 @@ data = dde.data.TimePDE(
 # Network architecture
 net = dde.nn.FNN([2] + [100] * 4 + [2], "tanh", "Glorot normal")
 
-# Model setup
-model = dde.Model(data, net)
-model.compile("adam", lr=1e-3, loss="MSE")
-model.train(iterations=10000, display_every=1000)
+dde.optimizers.config.set_LBFGS_options(
+    maxcor=50,
+    ftol=1.0 * np.finfo(float).eps,
+    gtol=1e-08,
+    maxiter=10000,
+    maxfun=10000,
+    maxls=50,
+)
+
+# Reload saved model
+model_path = "trained_model-10018.ckpt"
+
+loaded_model = dde.Model(data, net)
+loaded_model.compile("L-BFGS")
+loaded_model.restore(model_path)
+
+print("Model restored successfully.")
+
+loaded_model.compile("adam", lr=1e-3, loss="MSE")
+loaded_model.train(iterations=10000, display_every=1000)
 
 dde.optimizers.config.set_LBFGS_options(
     maxcor=50,
@@ -87,13 +103,13 @@ dde.optimizers.config.set_LBFGS_options(
     maxls=50,
 )
 
-model.compile("L-BFGS")
-losshistory, train_state = model.train()
+loaded_model.compile("L-BFGS")
+losshistory, train_state = loaded_model.train()
 dde.saveplot(losshistory, train_state, issave=True, isplot=True)
 
 # Save the trained model
-model_path = "trained_model"
-model.save(model_path)
+model_path = "retrained_model"
+loaded_model.save(model_path)
 
 print(f"Model saved at: {model_path}")
 
@@ -110,7 +126,7 @@ for i, t_specific in enumerate(t_specific_values):
     X_plot = np.hstack((x_plot, t_plot))
 
     # Predict the real and imaginary parts
-    prediction = model.predict(X_plot)
+    prediction = loaded_model.predict(X_plot)
     u_plot, v_plot = prediction[:, 0], prediction[:, 1]
 
     # Calculate |ψ(x, t)| = sqrt(u^2 + v^2)
@@ -135,7 +151,7 @@ xx_mesh, tt_mesh = np.meshgrid(xx_plot, tt_plot)
 
 # Prepare input for prediction
 XX_plot = np.hstack((xx_mesh.flatten()[:, None], tt_mesh.flatten()[:, None]))
-uu_plot = model.predict(XX_plot)
+uu_plot = loaded_model.predict(XX_plot)
 u_plot = uu_plot[:, 0].reshape(xx_mesh.shape)
 v_plot = uu_plot[:, 1].reshape(xx_mesh.shape)
 
@@ -186,7 +202,7 @@ def update(frame):
     X_input = np.hstack((x_vals, t_input))
 
     # Predict u and v using the trained model
-    prediction = model.predict(X_input)
+    prediction = loaded_model.predict(X_input)
     u_vals, v_vals = prediction[:, 0], prediction[:, 1]
 
     # Calculate |h(x, t)|
