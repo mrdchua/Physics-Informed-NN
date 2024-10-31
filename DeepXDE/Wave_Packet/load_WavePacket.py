@@ -7,7 +7,7 @@ from matplotlib.animation import FuncAnimation
 
 # Domain settings: Infinite square well from x=-10 to x=10
 x_domain = [-10.0, 10.0]
-t_domain = [0.0, 2.0]  # Time interval
+t_domain = [0.0, 10.0]  # Time interval
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
 time_domain = dde.geometry.TimeDomain(t_domain[0], t_domain[1])
@@ -39,14 +39,14 @@ def pde(x, y):
 
 def init_cond_u(x):
     # u = Re(ψ) part of the initial wave packet
-    k = 0.0 # initial momentum / wave number
-    sigma = 0.1 # width of Gaussian wave packet
+    k = 1.0 # initial momentum / wave number
+    sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.cos(k * x[:, 0:1]) * g
 
 def init_cond_v(x):
-    k = 0.0 # initial momentum / wave number
-    sigma = 0.1 # width of Gaussian wave packet
+    k = 1.0 # initial momentum / wave number
+    sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.sin(k * x[:, 0:1]) * g
 
@@ -67,8 +67,8 @@ data = dde.data.TimePDE(
     geomtime,
     pde,
     [bc_u, bc_v, ic_u, ic_v],
-    num_domain=20000,
-    num_boundary=50,
+    num_domain=40000,
+    num_boundary=100,
     num_initial=200,
     train_distribution="pseudo",
 )
@@ -95,6 +95,75 @@ loaded_model.restore(model_path)
 print("Model restored successfully.")
 
 #############################################################################################
+
+loaded_model.compile("adam", lr=1e-3, loss="MSE")
+loaded_model.train(iterations=10000, display_every=1000)
+
+loaded_model.compile("L-BFGS")
+losshistory, train_state = loaded_model.train()
+dde.saveplot(losshistory, train_state, issave=True, isplot=True)
+
+# Save the trained model
+model_path = "retrained_model"
+loaded_model.save(model_path)
+
+print(f"Model saved at: {model_path}")
+
+#####################################################################################################
+
+# Prediction at specific time steps
+x_plot = np.linspace(x_domain[0], x_domain[1], 100).reshape(-1, 1)
+t_specific_values = [0.0, 0.5, 0.9]  # Example time steps
+
+fig, axes = plt.subplots(1, len(t_specific_values), figsize=(15, 5))
+
+for i, t_specific in enumerate(t_specific_values):
+    t_plot = np.full_like(x_plot, t_specific)
+    X_plot = np.hstack((x_plot, t_plot))
+
+    # Predict the real and imaginary parts
+    prediction = loaded_model.predict(X_plot)
+    u_plot, v_plot = prediction[:, 0], prediction[:, 1]
+
+    # Calculate |ψ(x, t)| = sqrt(u^2 + v^2)
+    psi_abs = np.sqrt(u_plot**2 + v_plot**2)
+
+    # Plot the result
+    axes[i].plot(x_plot.flatten(), psi_abs, color='blue', linewidth=2, label=f't = {t_specific}')
+    axes[i].set_xlabel('x')
+    axes[i].set_ylabel('|ψ(x, t)|')
+    axes[i].set_title(f'|ψ(x, t)| at t = {t_specific}')
+    axes[i].legend()
+
+plt.tight_layout()
+plt.show()
+
+#####################################################################################################
+
+# Generate a heatmap for |ψ(x, t)|
+xx_plot = np.linspace(x_domain[0], x_domain[1], 100).astype(np.float32)
+tt_plot = np.linspace(t_domain[0], t_domain[1], 100).astype(np.float32)
+xx_mesh, tt_mesh = np.meshgrid(xx_plot, tt_plot)
+
+# Prepare input for prediction
+XX_plot = np.hstack((xx_mesh.flatten()[:, None], tt_mesh.flatten()[:, None]))
+uu_plot = loaded_model.predict(XX_plot)
+u_plot = uu_plot[:, 0].reshape(xx_mesh.shape)
+v_plot = uu_plot[:, 1].reshape(xx_mesh.shape)
+
+# Calculate |ψ(x, t)| = sqrt(u^2 + v^2)
+psi_abs = np.sqrt(u_plot**2 + v_plot**2)
+
+# Plot the heatmap
+plt.figure(figsize=(9, 4))
+plt.contourf(tt_plot, xx_plot, psi_abs.T, 100, cmap='viridis')
+plt.colorbar(label='|ψ(x, t)|')
+plt.xlabel('t')
+plt.ylabel('x')
+plt.title('Heatmap of |ψ(x, t)|')
+plt.show()
+
+#####################################################################################################
 
 # Generate x values for plotting
 x_vals = np.linspace(x_domain[0], x_domain[1], 100).reshape(-1, 1).astype(np.float32)

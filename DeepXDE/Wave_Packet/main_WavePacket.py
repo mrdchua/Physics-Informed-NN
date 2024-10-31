@@ -7,7 +7,7 @@ from matplotlib.animation import FuncAnimation
 
 # Domain settings: Infinite square well from x=-10 to x=10
 x_domain = [-10.0, 10.0]
-t_domain = [0.0, 5.0]  # Time interval
+t_domain = [0.0, 10.0]  # Time interval
 
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
 time_domain = dde.geometry.TimeDomain(t_domain[0], t_domain[1])
@@ -39,13 +39,13 @@ def pde(x, y):
 
 def init_cond_u(x):
     # u = Re(ψ) part of the initial wave packet
-    k = 5.0 # initial momentum / wave number
+    k = 1.0 # initial momentum / wave number
     sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.cos(k * x[:, 0:1]) * g
 
 def init_cond_v(x):
-    k = 5.0 # initial momentum / wave number
+    k = 1.0 # initial momentum / wave number
     sigma = 1.0 # width of Gaussian wave packet
     g = np.sqrt(1.0 / (np.sqrt(np.pi) * sigma) ) * np.exp(-x[:, 0:1]**2 / (2.0*sigma**2))
     return np.sin(k * x[:, 0:1]) * g
@@ -64,9 +64,9 @@ data = dde.data.TimePDE(
     geomtime,
     pde,
     [bc_u, bc_v, ic_u, ic_v],
-    num_domain=30000,
+    num_domain=40000,
     num_boundary=100,
-    num_initial=150,
+    num_initial=200,
     train_distribution="pseudo",
 )
 
