@@ -1,5 +1,5 @@
 import deepxde as dde
-from deepxde.backend import tf
+from deepxde.backend import tensorflow_compat_v1
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +12,11 @@ t_domain = [0.0, 10.0]  # Time interval
 space_domain = dde.geometry.Interval(x_domain[0], x_domain[1])
 time_domain = dde.geometry.TimeDomain(t_domain[0], t_domain[1])
 geomtime = dde.geometry.GeometryXTime(space_domain, time_domain)
+
+def get_initial_loss(model):
+    model.compile("adam", lr=0.001)
+    losshistory, train_state = model.train(0)
+    return losshistory.loss_train[0]
 
 def pde(x, y):
     # INPUTS:
@@ -64,7 +69,7 @@ data = dde.data.TimePDE(
     geomtime,
     pde,
     [bc_u, bc_v, ic_u, ic_v],
-    num_domain=40000,
+    num_domain=10000,
     num_boundary=100,
     num_initial=200,
     train_distribution="pseudo",
@@ -72,23 +77,22 @@ data = dde.data.TimePDE(
 
 # Network architecture
 net = dde.nn.FNN([2] + [100] * 4 + [2], "tanh", "Glorot normal")
+net.apply_feature_transform(lambda x: (x - 0.5) * 2 * np.sqrt(3))
 
-# Model setup
 model = dde.Model(data, net)
-model.compile("adam", lr=1e-3, loss="MSE")
-model.train(iterations=10000, display_every=1000)
-
-dde.optimizers.config.set_LBFGS_options(
-    maxcor=50,
-    ftol=1.0 * np.finfo(float).eps,
-    gtol=1e-08,
-    maxiter=50000,
-    maxfun=50000,
-    maxls=50,
+initial_losses = get_initial_loss(model)
+loss_weights = 5 / initial_losses
+model.compile(
+    "adam",
+    lr=0.001,
+    loss_weights=loss_weights,
+    decay=("inverse time", 2000, 0.9),
+)
+pde_residual_resampler = dde.callbacks.PDEPointResampler(period=1)
+losshistory, train_state = model.train(
+    iterations=10000, callbacks=[pde_residual_resampler], display_every=500
 )
 
-model.compile("L-BFGS")
-losshistory, train_state = model.train()
 dde.saveplot(losshistory, train_state, issave=True, isplot=True)
 
 # Save the trained model
