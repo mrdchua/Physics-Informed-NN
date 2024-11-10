@@ -17,8 +17,8 @@ import datetime
 # Generate Training Data
 batch_size_Nf = 20000
 batch_size_Nu = 100
-domain_x_train = (-5.0, 5.0)
-domain_t_train = (0.0, np.pi/2)
+domain_x_train = (-10.0, 10.0)
+domain_t_train = (0.0, 10)
 
 # Collocation points Nf
 engine = LatinHypercube(d=2, seed=42)
@@ -53,9 +53,19 @@ print(f"x_train does not touch boundaries: {x_within_bounds}")
 print(f"t_train does not touch boundaries: {t_within_bounds}")
 
 # initial condition
+def gaussian(x_f):
+    # u = Re(ψ) part of the initial wave packet
+    k = 0.0 # momentum or wave number
+    d = 1.0 # width of Gaussian wave packet
+
+    real_part = np.sqrt(1 / (d*np.sqrt(np.pi))) * np.exp(-x_f**2 / (2*d**2)) * np.cos(k*x_f)
+    # imag_part = np.sqrt(1 / (d*np.sqrt(np.pi))) * np.exp(-x_f**2 / (2*d**2)) * np.sin(k*x_f)
+
+    return real_part
+
 x_initial = np.linspace(domain_x_train[0], domain_x_train[1], batch_size_Nu).reshape(-1, 1).astype(np.float32)
 t_initial = np.full_like(x_initial, 0.0)
-u_initial = 2 / np.cosh(x_initial)
+u_initial = gaussian(x_initial)
 
 # boundary conditions
 t_bounds = np.linspace(domain_t_train[0], domain_t_train[1], batch_size_Nu).reshape(-1, 1).astype(np.float32)
@@ -122,8 +132,8 @@ def physics_loss(model, x_f, t_f):
     v_t = tf.gradients(v, t_f)[0]
     v_xx = tf.gradients(v_x, x_f)[0]
     
-    f_u = v_t - 0.5*u_xx - (u**2 + v**2)*u
-    f_v = u_t + 0.5*v_xx + (u**2 + v**2)*v  
+    f_u = v_t - 0.5*u_xx
+    f_v = u_t + 0.5*v_xx
 
     return tf.reduce_mean(tf.square(f_u)) + tf.reduce_mean(tf.square(f_v))
 
@@ -137,18 +147,18 @@ def initial_cond_loss(model, x_f, t_f, u_true):
 
     return tf.reduce_mean(tf.square(loss_val))
 
-def periodic_bc_loss(model, x_left, x_right, t_f):
-    u_left, v_left, u_x_left, v_x_left = net_uv(model, x_left, t_f)
-    u_right, v_right, u_x_right, v_x_right = net_uv(model, x_right, t_f)
+def Dirichlet_bc_loss(model, x_f, t_f):
+    uv = model(tf.concat([x_f, t_f], axis=1))
+    u_pred = uv[:,0:1]
+    v_pred = uv[:,1:2]
 
-    u_loss = u_left - u_right
-    v_loss = v_left - v_right
+    # value = np.full_like(x_f, 0)
+    # boundary_val = tf.convert_to_tensor(value)
 
-    u_x_loss = u_x_left - u_x_right
-    v_x_loss = v_x_left - v_x_right
+    # loss_real = u_pred - boundary_val
+    # loss_imag = v_pred - boundary_val
     
-    return tf.reduce_mean(tf.square(u_loss)) + tf.reduce_mean(tf.square(v_loss)) + \
-        tf.reduce_mean(tf.square(u_x_loss)) + tf.reduce_mean(tf.square(v_x_loss))
+    return tf.reduce_mean(tf.square(u_pred)) + tf.reduce_mean(tf.square(v_pred))
 
 #############################################################################
 
@@ -164,8 +174,9 @@ def train_step(x_train, t_train, x_initial, t_initial, u_initial, x_left, x_righ
     with tf.GradientTape() as tape:
         pde_loss = physics_loss(pinn, x_train, t_train)
         initial_loss = initial_cond_loss(pinn, x_initial, t_initial, u_initial)
-        bc_loss = periodic_bc_loss(pinn, x_left, x_right, t_bounds)
-        loss = pde_loss + initial_loss + bc_loss
+        bc_loss_left = Dirichlet_bc_loss(pinn, x_left, t_bounds)
+        bc_loss_right = Dirichlet_bc_loss(pinn, x_right, t_bounds)
+        loss = pde_loss + initial_loss + bc_loss_left + bc_loss_right
         
     gradients = tape.gradient(loss, pinn.trainable_variables)
     optimizer.apply_gradients(zip(gradients, pinn.trainable_variables))
@@ -178,7 +189,7 @@ loss_history = []
 epoch_history = [0,]
 
 # Define the loss threshold
-loss_threshold = 1e-2
+loss_threshold = 1e-4
 
 # Early stopping
 early_stopping_patience = 500
@@ -198,7 +209,7 @@ while True:
         print(f"Epoch {epoch}: Loss = {loss.numpy()}")
         
         # Save the model in Keras format
-        model_save_path_0 = "interrupted_TDSE_v2.keras"
+        model_save_path_0 = "interrupted_wave_packet.keras"
         pinn.save(model_save_path_0)
         print(f"Model saved to {model_save_path_0}")
         
@@ -241,7 +252,7 @@ plt.grid(True)
 plt.show()
 
 # Save the model in Keras format
-model_save_path = "TDSE_v2.keras"
+model_save_path = "wave_packet.keras"
 pinn.save(model_save_path)
 print(f"Model saved to {model_save_path}")
 
